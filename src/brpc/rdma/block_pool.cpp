@@ -264,7 +264,9 @@ static void* AllocBlockFrom(int block_type) {
             // There is no block left, extend a new region
             if (!ExtendBlockPool(FLAGS_rdma_memory_pool_increase_size_mb,
                                  block_type)) {
-                LOG_EVERY_SECOND(ERROR) << "Fail to extend new region";
+                LOG_EVERY_SECOND(ERROR) << "rdma_block_pool: Fail to extend new region."
+                                        << " current_regions=" << g_region_num
+                                        << " max_regions=" << g_max_regions;
                 return NULL;
             } else {
                 PickReadyBlocks(block_type, index);

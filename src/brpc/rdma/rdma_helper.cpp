@@ -158,6 +158,10 @@ static void* BlockAllocate(size_t len) {
                 ptr = NULL;
             } else {
                 BAIDU_SCOPED_LOCK(g_addr_map_lock);
+                if (g_addr_map->size() > 10000) {
+                    LOG(INFO) << "too many blocks";
+                    exit(123);
+                }
                 if (!g_addr_map->insert(ptr, mr)) {
                     PLOG(ERROR) << "Fail to insert to g_addr_map";
                     ibv_dereg_mr(mr);
@@ -166,6 +170,7 @@ static void* BlockAllocate(size_t len) {
                 }
             }
         }
+        LOG(INFO) << "allocate buf=" << ptr << " len=" << len;
     }
 
     return ptr;
@@ -186,6 +191,7 @@ void BlockDeallocate(void* buf) {
                 g_addr_map->erase(buf);
             }
         }
+        LOG(INFO) << "deallocate buf=" << buf;
         // Note that a block allocated before RDMA is initialized can
         // be deallocated here even if it is not in the g_addr_map.
         g_mem_dealloc(buf);
