@@ -40,32 +40,36 @@ TEST_F(BlockPoolTest, single_thread) {
     FLAGS_rdma_memory_pool_max_regions = 16;
     EXPECT_TRUE(InitBlockPool(DummyCallback) != NULL);
 
-    void* buf[4096];
-    for (int i = 0; i < 4096; ++i) {
+    size_t num = 4096;
+    if (num > 1024 * 1024 * 1024 / GetBlockSize(0)) {
+        num = 1024 * 1024 * 1024 / GetBlockSize(0);
+    }
+    void* buf[num];
+    for (size_t i = 0; i < num; ++i) {
         buf[i] = AllocBlock(8192);
         EXPECT_TRUE(buf[i] != NULL);
         EXPECT_EQ(0, GetBlockType(buf[i]));
         EXPECT_EQ(0, GetBlockType(buf[i]));
     }
-    for (int i = 0; i < 4096; ++i) {
+    for (size_t i = 0; i < num; ++i) {
         DeallocBlock(buf[i]);
         buf[i] = NULL;
     }
-    for (int i = 0; i < 4096; ++i) {
+    for (size_t i = 0; i < num; ++i) {
         buf[i] = AllocBlock(GetBlockSize(0) + 1);
         EXPECT_TRUE(buf[i] != NULL);
         EXPECT_EQ(1, GetBlockType(buf[i]));
     }
-    for (int i = 4095; i >= 0; --i) {
+    for (int i = num - 1; i >= 0; --i) {
         DeallocBlock(buf[i]);
         buf[i] = NULL;
     }
-    for (int i = 0; i < 4096; ++i) {
+    for (size_t i = 0; i < num; ++i) {
         buf[i] = AllocBlock(GetBlockSize(3));
         EXPECT_TRUE(buf[i] != NULL);
         EXPECT_EQ(3, GetBlockType(buf[i]));
     }
-    for (int i = 4095; i >= 0; --i) {
+    for (int i = num - 1; i >= 0; --i) {
         DeallocBlock(buf[i]);
         buf[i] = NULL;
     }
@@ -73,20 +77,14 @@ TEST_F(BlockPoolTest, single_thread) {
     DestroyBlockPool();
 }
 
-const char one[65536] = { 1 };
-const char zero[65536] = { 0 };
-
 static void* AllocAndDealloc(void* arg) {
     uintptr_t i = (uintptr_t)arg;
     int len = GetBlockSize(i % 4);
     int iterations = 1000;
     while (iterations > 0) {
         void* buf = AllocBlock(len);
-        memcpy(buf, one, len);
         EXPECT_TRUE(buf != NULL);
         EXPECT_EQ(i % 4, GetBlockType(buf));
-        EXPECT_EQ(0, memcmp(buf, one, len));
-        memcpy(buf, zero, len);
         DeallocBlock(buf);
         --iterations;
     }
@@ -94,8 +92,8 @@ static void* AllocAndDealloc(void* arg) {
 }
 
 TEST_F(BlockPoolTest, multiple_thread) {
-    FLAGS_rdma_memory_pool_initial_size_mb = 512;
-    FLAGS_rdma_memory_pool_increase_size_mb = 512;
+    FLAGS_rdma_memory_pool_initial_size_mb = 1024 * 8;
+    FLAGS_rdma_memory_pool_increase_size_mb = 1024 * 8;
     EXPECT_TRUE(InitBlockPool(DummyCallback) != NULL);
 
     uintptr_t thread_num = 32;
@@ -120,8 +118,12 @@ TEST_F(BlockPoolTest, extend) {
     EXPECT_TRUE(InitBlockPool(DummyCallback) != NULL);
 
     EXPECT_EQ(1, GetRegionNum());
-    void* buf[4096];
-    for (int i = 0; i < 4096; ++i) {
+    size_t num = 4096;
+    if (num > 1024 * 1024 * 1024 / GetBlockSize(0)) {
+        num = 1024 * 1024 * 1024 / GetBlockSize(0);
+    }
+    void* buf[num];
+    for (size_t i = 0; i < num; ++i) {
         buf[i] = AllocBlock(65534);
         EXPECT_TRUE(buf[i] != NULL);
     }
@@ -130,7 +132,7 @@ TEST_F(BlockPoolTest, extend) {
 #else
     EXPECT_EQ(5, GetRegionNum());
 #endif
-    for (int i = 0; i < 4096; ++i) {
+    for (size_t i = 0; i < num; ++i) {
         DeallocBlock(buf[i]);
     }
 #ifdef IOBUF_HUGE_BLOCK
@@ -150,12 +152,12 @@ TEST_F(BlockPoolTest, memory_not_enough) {
     EXPECT_TRUE(InitBlockPool(DummyCallback) != NULL);
 
     EXPECT_EQ(1, GetRegionNum());
-    void* buf[15360];
-#ifdef IOBUF_HUGE_BLOCK
-    for (int i = 0; i < 4096; ++i) {
-#else
-    for (int i = 0; i < 15360; ++i) {
-#endif
+    size_t num = 15360;
+    if (num > 1024 * 1024 * 1024 / GetBlockSize(0)) {
+        num = 1024 * 1024 * 1024 / GetBlockSize(0);
+    }
+    void* buf[num];
+    for (size_t i = 0; i < num; ++i) {
         buf[i] = AllocBlock(65534);
         EXPECT_TRUE(buf[i] != NULL);
     }
@@ -163,11 +165,7 @@ TEST_F(BlockPoolTest, memory_not_enough) {
     void* tmp = AllocBlock(65536);
     EXPECT_EQ(ENOMEM, errno);
     EXPECT_EQ(0, GetRegionId(tmp));
-#ifdef IOBUF_HUGE_BLOCK
-    for (int i = 0; i < 4096; ++i) {
-#else
-    for (int i = 0; i < 15360; ++i) {
-#endif
+    for (size_t i = 0; i < num; ++i) {
         DeallocBlock(buf[i]);
     }
     EXPECT_EQ(16, GetRegionNum());
